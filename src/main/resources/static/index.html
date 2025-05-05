@@ -1,10 +1,607 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+    <title>PharmaStock - Gestion de Stock Pharmacie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .notification {
+            animation: slideIn 0.5s forwards, fadeOut 0.5s 3s forwards;
+        }
+
+        @keyframes slideIn {
+            from { right: -100%; }
+            to { right: 20px; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
 </head>
-<body>
-<h1>testtttttttt</h1>
+<body class="bg-gray-50 font-sans">
+<!-- Notification -->
+<div id="notification" class="notification fixed top-5 right-5 hidden z-50">
+    <div class="px-6 py-4 rounded-lg shadow-lg bg-green-500 text-white flex items-center">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span id="notification-message">Opération réussie</span>
+    </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar fixed inset-y-0 left-0 bg-white shadow-lg w-64 transform -translate-x-full md:translate-x-0 z-40">
+    <div class="flex items-center justify-center h-16 bg-blue-600 text-white">
+        <i class="fas fa-pills mr-2 text-xl"></i>
+        <h1 class="text-xl font-bold">PharmaStock</h1>
+    </div>
+    <nav class="mt-6">
+        <div class="px-6 py-3 flex items-center bg-blue-100 text-blue-700 border-l-4 border-blue-700">
+            <i class="fas fa-tachometer-alt mr-3"></i>
+            <span class="font-medium">Tableau de Bord</span>
+        </div>
+        <div id="view-products-btn" class="px-6 py-3 flex items-center hover:bg-gray-100 cursor-pointer">
+            <i class="fas fa-list mr-3 text-gray-600"></i>
+            <span>Voir les Produits</span>
+        </div>
+        <div id="add-product-btn" class="px-6 py-3 flex items-center hover:bg-gray-100 cursor-pointer">
+            <i class="fas fa-plus-circle mr-3 text-gray-600"></i>
+            <span>Ajouter un Produit</span>
+        </div>
+        <div class="px-6 py-3 flex items-center hover:bg-gray-100 cursor-pointer">
+            <i class="fas fa-chart-bar mr-3 text-gray-600"></i>
+            <span>Statistiques</span>
+        </div>
+        <div class="px-6 py-3 flex items-center hover:bg-gray-100 cursor-pointer">
+            <i class="fas fa-cog mr-3 text-gray-600"></i>
+            <span>Paramètres</span>
+        </div>
+    </nav>
+    <div class="absolute bottom-0 w-full p-4 border-t">
+        <div class="flex items-center">
+            <img class="h-8 w-8 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Profile">
+            <div class="ml-3">
+                <p class="text-sm font-medium">Pharmacien</p>
+                <p class="text-xs text-gray-500">Admin</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile sidebar toggle -->
+<div class="md:hidden fixed top-4 left-4 z-50">
+    <button id="sidebar-toggle" class="p-2 rounded-md bg-blue-600 text-white focus:outline-none">
+        <i class="fas fa-bars"></i>
+    </button>
+</div>
+
+<!-- Overlay -->
+<div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
+
+<!-- Main Content -->
+<div class="md:ml-64 transition-all duration-300">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <h1 class="text-lg font-semibold text-gray-900">Gestion des Produits</h1>
+            <div class="relative">
+                <input type="text" placeholder="Rechercher un produit..." class="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Dashboard Cards -->
+        <div id="dashboard-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <i class="fas fa-pills text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Produits en Stock</p>
+                        <p id="total-products" class="text-2xl font-semibold">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        <i class="fas fa-box-open text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Stock Total</p>
+                        <p id="total-stock" class="text-2xl font-semibold">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                        <i class="fas fa-exclamation-triangle text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Stock Faible</p>
+                        <p id="low-stock" class="text-2xl font-semibold">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                        <i class="fas fa-money-bill-wave text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Valeur Totale</p>
+                        <p id="total-value" class="text-2xl font-semibold">0 €</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products List -->
+        <div id="products-list" class="fade-in">
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-800">Liste des Produits</h2>
+                    <button id="add-product-btn-2" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+                        <i class="fas fa-plus mr-2"></i> Ajouter
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantité</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prix</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody id="products-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Products will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div class="text-sm text-gray-500">
+                        Affichage de <span id="start-item" class="font-medium">1</span> à <span id="end-item" class="font-medium">10</span> sur <span id="total-items" class="font-medium">0</span> produits
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="prev-page" class="px-3 py-1 border rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50" disabled>
+                            Précédent
+                        </button>
+                        <button id="next-page" class="px-3 py-1 border rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50" disabled>
+                            Suivant
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Product Form -->
+        <div id="product-form-container" class="hidden fade-in">
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800" id="form-title">Ajouter un Produit</h2>
+                </div>
+                <div class="px-6 py-4">
+                    <form id="product-form" class="space-y-4">
+                        <input type="hidden" id="product-id">
+                        <div>
+                            <label for="product-name" class="block text-sm font-medium text-gray-700">Nom du Produit</label>
+                            <input type="text" id="product-name" name="product-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="product-quantity" class="block text-sm font-medium text-gray-700">Quantité en Stock</label>
+                                <input type="number" id="product-quantity" name="product-quantity" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="product-price" class="block text-sm font-medium text-gray-700">Prix (€)</label>
+                                <input type="number" step="0.01" id="product-price" name="product-price" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="product-description" class="block text-sm font-medium text-gray-700">Description</label>
+                            <textarea id="product-description" name="product-description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" id="cancel-form" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Annuler
+                            </button>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Details Modal -->
+        <div id="product-details-modal" class="fixed inset-0 z-50 hidden">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <i class="fas fa-pills text-blue-600"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Détails du Produit</h3>
+                                <div class="mt-4 space-y-2">
+                                    <div>
+                                        <p class="text-sm text-gray-500"><span class="font-medium">ID:</span> <span id="detail-id"></span></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500"><span class="font-medium">Nom:</span> <span id="detail-name"></span></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500"><span class="font-medium">Quantité:</span> <span id="detail-quantity"></span></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500"><span class="font-medium">Prix:</span> <span id="detail-price"></span> €</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500"><span class="font-medium">Description:</span> <span id="detail-description"></span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="button" id="edit-product-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Modifier
+                        </button>
+                        <button type="button" id="delete-product-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Supprimer
+                        </button>
+                        <button type="button" id="close-details-modal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Fermer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Sample data - in a real app, this would come from your Spring Boot API
+    let products = [
+        { id: 1, name: "Paracétamol 500mg", quantity: 150, price: 2.99, description: "Antidouleur et antipyrétique" },
+        { id: 2, name: "Ibuprofène 200mg", quantity: 120, price: 3.49, description: "Anti-inflammatoire non stéroïdien" },
+        { id: 3, name: "Vitamine C 500mg", quantity: 80, price: 5.99, description: "Complément alimentaire" },
+        { id: 4, name: "Doliprane 1000mg", quantity: 90, price: 4.29, description: "Antidouleur et antipyrétique" },
+        { id: 5, name: "Spray nasal", quantity: 45, price: 6.79, description: "Décongestionnant nasal" },
+        { id: 6, name: "Gel hydroalcoolique", quantity: 200, price: 3.99, description: "Désinfectant pour les mains" },
+        { id: 7, name: "Pansements", quantity: 180, price: 2.49, description: "Pansements adhésifs" },
+        { id: 8, name: "Sirop contre la toux", quantity: 60, price: 7.29, description: "Sirop antitussif" },
+        { id: 9, name: "Crème hydratante", quantity: 75, price: 8.99, description: "Crème pour peau sèche" },
+        { id: 10, name: "Bandes de contention", quantity: 50, price: 9.49, description: "Pour problèmes circulatoires" }
+    ];
+
+    // Current page for pagination
+    let currentPage = 1;
+    const itemsPerPage = 5;
+    let currentProductId = null;
+
+    // DOM Elements
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('overlay');
+    const viewProductsBtn = document.getElementById('view-products-btn');
+    const addProductBtn = document.getElementById('add-product-btn');
+    const addProductBtn2 = document.getElementById('add-product-btn-2');
+    const productsList = document.getElementById('products-list');
+    const productFormContainer = document.getElementById('product-form-container');
+    const productForm = document.getElementById('product-form');
+    const cancelForm = document.getElementById('cancel-form');
+    const productsTableBody = document.getElementById('products-table-body');
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+    const startItem = document.getElementById('start-item');
+    const endItem = document.getElementById('end-item');
+    const totalItems = document.getElementById('total-items');
+    const totalProducts = document.getElementById('total-products');
+    const totalStock = document.getElementById('total-stock');
+    const lowStock = document.getElementById('low-stock');
+    const totalValue = document.getElementById('total-value');
+    const productDetailsModal = document.getElementById('product-details-modal');
+    const closeDetailsModal = document.getElementById('close-details-modal');
+    const editProductBtn = document.getElementById('edit-product-btn');
+    const deleteProductBtn = document.getElementById('delete-product-btn');
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notification-message');
+
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDashboardStats();
+        renderProductsTable();
+        setupEventListeners();
+    });
+
+    // Set up event listeners
+    function setupEventListeners() {
+        // Sidebar toggle for mobile
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+
+        // Navigation
+        viewProductsBtn.addEventListener('click', showProductsList);
+        addProductBtn.addEventListener('click', showAddProductForm);
+        addProductBtn2.addEventListener('click', showAddProductForm);
+
+        // Form handling
+        productForm.addEventListener('submit', handleFormSubmit);
+        cancelForm.addEventListener('click', showProductsList);
+
+        // Pagination
+        prevPageBtn.addEventListener('click', goToPrevPage);
+        nextPageBtn.addEventListener('click', goToNextPage);
+
+        // Modal handling
+        closeDetailsModal.addEventListener('click', () => {
+            productDetailsModal.classList.add('hidden');
+        });
+        editProductBtn.addEventListener('click', editCurrentProduct);
+        deleteProductBtn.addEventListener('click', deleteCurrentProduct);
+    }
+
+    // Toggle sidebar on mobile
+    function toggleSidebar() {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    }
+
+    // Show products list view
+    function showProductsList() {
+        productFormContainer.classList.add('hidden');
+        productsList.classList.remove('hidden');
+        updateDashboardStats();
+        renderProductsTable();
+    }
+
+    // Show add product form
+    function showAddProductForm() {
+        // Reset form
+        productForm.reset();
+        document.getElementById('product-id').value = '';
+        document.getElementById('form-title').textContent = 'Ajouter un Produit';
+
+        productsList.classList.add('hidden');
+        productFormContainer.classList.remove('hidden');
+    }
+
+    // Show edit product form
+    function showEditProductForm(product) {
+        document.getElementById('product-id').value = product.id;
+        document.getElementById('product-name').value = product.name;
+        document.getElementById('product-quantity').value = product.quantity;
+        document.getElementById('product-price').value = product.price;
+        document.getElementById('product-description').value = product.description;
+        document.getElementById('form-title').textContent = 'Modifier le Produit';
+
+        productsList.classList.add('hidden');
+        productFormContainer.classList.remove('hidden');
+    }
+
+    // Handle form submission (add/edit)
+    function handleFormSubmit(e) {
+        e.preventDefault();
+
+        const id = document.getElementById('product-id').value;
+        const name = document.getElementById('product-name').value;
+        const quantity = parseInt(document.getElementById('product-quantity').value);
+        const price = parseFloat(document.getElementById('product-price').value);
+        const description = document.getElementById('product-description').value;
+
+        if (!name || isNaN(quantity) || isNaN(price)) {
+            showNotification('Veuillez remplir tous les champs obligatoires', 'error');
+            return;
+        }
+
+        if (id) {
+            // Edit existing product
+            const index = products.findIndex(p => p.id == id);
+            if (index !== -1) {
+                products[index] = { id: parseInt(id), name, quantity, price, description };
+                showNotification('Produit modifié avec succès');
+            }
+        } else {
+            // Add new product
+            const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+            products.push({ id: newId, name, quantity, price, description });
+            showNotification('Produit ajouté avec succès');
+        }
+
+        showProductsList();
+    }
+
+    // Render products table with pagination
+    function renderProductsTable() {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedProducts = products.slice(startIndex, endIndex);
+
+        productsTableBody.innerHTML = '';
+
+        if (paginatedProducts.length === 0) {
+            productsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Aucun produit trouvé</td>
+                    </tr>
+                `;
+        } else {
+            paginatedProducts.forEach(product => {
+                const statusClass = product.quantity < 30 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+                const statusText = product.quantity < 30 ? 'Stock faible' : 'En stock';
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${product.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.quantity}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.price.toFixed(2)} €</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-blue-600 hover:text-blue-900 mr-3 view-product-btn" data-id="${product.id}">Voir</button>
+                            <button class="text-indigo-600 hover:text-indigo-900 edit-product-btn" data-id="${product.id}">Modifier</button>
+                        </td>
+                    `;
+                productsTableBody.appendChild(row);
+            });
+
+            // Add event listeners to the buttons
+            document.querySelectorAll('.view-product-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const productId = e.target.getAttribute('data-id');
+                    viewProductDetails(productId);
+                });
+            });
+
+            document.querySelectorAll('.edit-product-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const productId = e.target.getAttribute('data-id');
+                    editProduct(productId);
+                });
+            });
+        }
+
+        // Update pagination info
+        startItem.textContent = startIndex + 1;
+        endItem.textContent = Math.min(endIndex, products.length);
+        totalItems.textContent = products.length;
+
+        // Update pagination buttons
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = endIndex >= products.length;
+    }
+
+    // View product details
+    function viewProductDetails(productId) {
+        const product = products.find(p => p.id == productId);
+        if (product) {
+            document.getElementById('detail-id').textContent = product.id;
+            document.getElementById('detail-name').textContent = product.name;
+            document.getElementById('detail-quantity').textContent = product.quantity;
+            document.getElementById('detail-price').textContent = product.price.toFixed(2);
+            document.getElementById('detail-description').textContent = product.description;
+
+            currentProductId = productId;
+            productDetailsModal.classList.remove('hidden');
+        }
+    }
+
+    // Edit product
+    function editProduct(productId) {
+        const product = products.find(p => p.id == productId);
+        if (product) {
+            showEditProductForm(product);
+        }
+    }
+
+    // Edit current product (from modal)
+    function editCurrentProduct() {
+        if (currentProductId) {
+            editProduct(currentProductId);
+            productDetailsModal.classList.add('hidden');
+        }
+    }
+
+    // Delete current product (from modal)
+    function deleteCurrentProduct() {
+        if (currentProductId) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+                products = products.filter(p => p.id != currentProductId);
+                showNotification('Produit supprimé avec succès');
+                productDetailsModal.classList.add('hidden');
+                showProductsList();
+            }
+        }
+    }
+
+    // Pagination functions
+    function goToPrevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            renderProductsTable();
+        }
+    }
+
+    function goToNextPage() {
+        const totalPages = Math.ceil(products.length / itemsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderProductsTable();
+        }
+    }
+
+    // Update dashboard statistics
+    function updateDashboardStats() {
+        totalProducts.textContent = products.length;
+
+        const totalQuantity = products.reduce((sum, product) => sum + product.quantity, 0);
+        totalStock.textContent = totalQuantity;
+
+        const lowStockCount = products.filter(product => product.quantity < 30).length;
+        lowStock.textContent = lowStockCount;
+
+        const totalVal = products.reduce((sum, product) => sum + (product.quantity * product.price), 0);
+        totalValue.textContent = totalVal.toFixed(2) + ' €';
+    }
+
+    // Show notification
+    function showNotification(message, type = 'success') {
+        notificationMessage.textContent = message;
+        notification.className = `notification fixed top-5 right-5 z-50`;
+
+        if (type === 'error') {
+            notification.querySelector('div').className = 'px-6 py-4 rounded-lg shadow-lg bg-red-500 text-white flex items-center';
+            notification.querySelector('i').className = 'fas fa-exclamation-circle mr-2';
+        } else {
+            notification.querySelector('div').className = 'px-6 py-4 rounded-lg shadow-lg bg-green-500 text-white flex items-center';
+            notification.querySelector('i').className = 'fas fa-check-circle mr-2';
+        }
+
+        notification.classList.remove('hidden');
+
+        setTimeout(() => {
+            notification.classList.add('hidden');
+        }, 3000);
+    }
+</script>
 </body>
 </html>
